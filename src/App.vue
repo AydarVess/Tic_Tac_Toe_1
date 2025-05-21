@@ -198,7 +198,7 @@ watch(board, () => impact("light"));
 watch(winner, (w) => w && tg?.hapticFeedback?.notificationOccurred("success"));
 
 watch(winner, (w) => {
-  if (!w || w === 'draws') {
+  if (!w || w === "draws") {
     tg?.MainButton.hide();
     return;
   }
@@ -217,10 +217,11 @@ watch(winner, (w) => {
 });
 
 function share() {
-  tg.shareMessage({
-    message: `Я только что выиграл в Tik-Tak-Toe! Попробуй и ты 😉`,
-    url: location.href,
-  });
+  const text = encodeURIComponent(
+    "Я только что выиграл в Крестики-Нолики! Попробуй и ты 😉"
+  );
+  const url = "https://aydarvess.github.io/Tic_Tac_Toe_1";
+  tg.openTelegramLink(`https://t.me/share/url?url=${url}&text=${text}`);
 }
 </script>
 
