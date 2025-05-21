@@ -2,6 +2,27 @@
   <div class="game">
     <h1 class="game__title">Крестики‑нолики</h1>
 
+    <div class="game__modes">
+      <button
+        @click="switchMode('multiplayer')"
+        class="game__button-reset"
+        :disabled="gameMode === 'multiplayer'"
+        :style="{ opacity: gameMode === 'multiplayer' ? 0.55 : 1 }"
+      >
+        2 игрока
+      </button>
+      <button
+        @click="switchMode('bot')"
+        class="game__button-reset"
+        :disabled="gameMode === 'bot'"
+        :style="{ opacity: gameMode === 'bot' ? 0.55 : 1 }"
+      >
+        VS бот
+      </button>
+    </div>
+
+    <div class="game__mode-label">Режим: {{ currentModeLabel }}</div>
+
     <div class="game__board">
       <div
         v-for="(cell, index) in board"
@@ -29,6 +50,19 @@ import { ref, computed } from "vue";
 
 const board = ref(Array(9).fill(""));
 const xIsNext = ref(true);
+
+const gameMode = ref("multiplayer");
+const botSymbol = ref("O");
+
+function switchMode(mode) {
+  if (mode === gameMode.value) return;
+  gameMode.value = mode;
+  reset();
+}
+
+const currentModeLabel = computed(() =>
+  gameMode.value === "multiplayer" ? "2 игрока" : "VS бот"
+);
 
 const lines = [
   [0, 1, 2],
@@ -58,23 +92,61 @@ const winner = computed(() =>
   winningLine.value.length ? board.value[winningLine.value[0]] : null
 );
 
-const status = computed(() =>
-  winner.value
-    ? `Победитель: ${winner.value}`
-    : board.value.every((cell) => cell)
-    ? "Ничья!"
-    : `Ход: ${xIsNext.value ? "X" : "O"}`
-);
+const status = computed(() => {
+  if (winner.value) return `Победитель: ${winner.value}`;
+  if (board.value.every((cell) => cell)) return "Ничья!";
+  return gameMode.value === "bot" && currentTurnIsBot()
+    ? "Ходит&nbsp;бот…"
+    : `Ход: ${xIsNext.value ? "X" : "O"}`;
+});
 
 function makeMove(index) {
-  if (board.value[index] || winner.value) return;
-  board.value[index] = xIsNext.value ? "X" : "O";
+  if (
+    board.value[index] ||
+    winner.value ||
+    (gameMode.value === "bot" && currentTurnIsBot())
+  )
+    return;
+  placeSymbol(index, xIsNext.value ? "X" : "O");
+  maybeBotMove();
+}
+
+function placeSymbol(index, symbol) {
+  board.value[index] = symbol;
   xIsNext.value = !xIsNext.value;
+}
+
+function currentTurnIsBot() {
+  const currentSymbol = xIsNext.value ? "X" : "O";
+  return gameMode.value === "bot" && botSymbol.value === currentSymbol;
+}
+
+function maybeBotMove() {
+  if (!currentTurnIsBot() || winner.value) return;
+  setTimeout(() => {
+    const empty = board.value
+      .map((v, i) => (v === "" ? i : null))
+      .filter((v) => v !== null);
+    if (!empty.length) return;
+    const randomIndex = empty[Math.floor(Math.random() * empty.length)];
+    placeSymbol(randomIndex, botSymbol.value);
+  }, 300);
 }
 
 function reset() {
   board.value = Array(9).fill("");
-  xIsNext.value = true;
+
+  if (gameMode.value === "bot") {
+    const botFirst = Math.random() < 0.5;
+    botSymbol.value = botFirst ? "X" : "O";
+    xIsNext.value = true;
+
+    if (botFirst) {
+      maybeBotMove();
+    }
+  } else {
+    xIsNext.value = true;
+  }
 }
 </script>
 
@@ -88,8 +160,8 @@ function reset() {
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   background: radial-gradient(circle at top, #f0f4ff 0%, #d9e8ff 100%);
   min-height: 100vh;
   display: flex;
@@ -110,6 +182,20 @@ body {
   color: #333;
   letter-spacing: 0.5px;
   text-align: center;
+}
+
+.game__modes {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.game__mode-label {
+  text-align: center;
+  margin-bottom: 0.25rem;
+  color: #555;
+  font-size: 0.9rem;
 }
 
 .game__board {
@@ -160,7 +246,8 @@ body {
   color: #ff3366;
 }
 
-.game__board-cell_win, .game__board-cell_win:hover {
+.game__board-cell_win,
+.game__board-cell_win:hover {
   background: #ffe869;
   border-color: #ffda47;
   animation: pulse 0.8s infinite alternate;
