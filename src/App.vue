@@ -5,7 +5,7 @@
     <div class="game__modes">
       <button
         @click="switchMode('multiplayer')"
-        class="game__button-reset"
+        class="game__button"
         :disabled="gameMode === 'multiplayer'"
         :style="{ opacity: gameMode === 'multiplayer' ? 0.55 : 1 }"
       >
@@ -13,7 +13,7 @@
       </button>
       <button
         @click="switchMode('bot')"
-        class="game__button-reset"
+        class="game__button"
         :disabled="gameMode === 'bot'"
         :style="{ opacity: gameMode === 'bot' ? 0.55 : 1 }"
       >
@@ -41,16 +41,25 @@
 
     <div class="game__status">{{ status }}</div>
 
-    <button @click="reset" class="game__button-reset">Сброс</button>
+    <button @click="reset" class="game__button">Сброс игру</button>
+
+    <div class="game__stats">
+      X - Побед: {{ stats.X }} | O - Побед: {{ stats.O }} | Ничья:
+      {{ stats.draws }}
+    </div>
+
+    <button @click="share" class="game__button">Поделиться</button>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
+
+const tg = window.Telegram?.WebApp;
+tg && tg.ready();
 
 const board = ref(Array(9).fill(""));
 const xIsNext = ref(true);
-
 const gameMode = ref("multiplayer");
 const botSymbol = ref("O");
 
@@ -88,12 +97,14 @@ const winningLine = computed(() => {
   return [];
 });
 
-const winner = computed(() =>
-  winningLine.value.length ? board.value[winningLine.value[0]] : null
-);
+const winner = computed(() => {
+  if (winningLine.value.length) return board.value[winningLine.value[0]];
+  return !board.value.every((cell) => cell) ? null : "draws";
+});
 
 const status = computed(() => {
-  if (winner.value) return `Победитель: ${winner.value}`;
+  if (winner.value && winner.value !== "draws")
+    return `Победитель: ${winner.value}`;
   if (board.value.every((cell) => cell)) return "Ничья!";
   return gameMode.value === "bot" && currentTurnIsBot()
     ? "Ходит&nbsp;бот…"
@@ -147,6 +158,69 @@ function reset() {
   } else {
     xIsNext.value = true;
   }
+}
+
+onMounted(() => {
+  applyTheme();
+  tg?.expand();
+});
+tg?.onEvent("themeChanged", applyTheme);
+
+function applyTheme() {
+  const dark = tg?.colorScheme === "dark";
+  document.body.style.background = dark
+    ? "#1d1e22"
+    : "radial-gradient(circle at top, #f0f4ff 0%, #d9e8ff 100%)";
+}
+
+const stats = ref({ X: 0, O: 0, draws: 0 });
+onMounted(() => {
+  tg?.deviceStorage?.getItem("ttt_stats", (err, val) => {
+    if (!err && val) stats.value = JSON.parse(val);
+  });
+});
+
+watch(
+  () => winner.value,
+  (w) => {
+    if (!w) return;
+
+    stats.value[w]++;
+    tg?.deviceStorage?.setItem("ttt_stats", JSON.stringify(stats.value));
+  }
+);
+
+function impact(type = "medium") {
+  tg?.hapticFeedback?.impactOccurred(type);
+}
+
+watch(board, () => impact("light"));
+watch(winner, (w) => w && tg?.hapticFeedback?.notificationOccurred("success"));
+
+watch(winner, (w) => {
+  if (!w) {
+    tg?.MainButton.hide();
+    return;
+  }
+  tg.MainButton.setText(`🎉 ${w} победил – поделиться`)
+    .show()
+    .onClick(() => {
+      const payload = {
+        winner: w,
+        mode: gameMode.value,
+        stats: stats.value,
+        ts: Date.now(),
+      };
+      tg.sendData(JSON.stringify(payload));
+      tg.MainButton.offClick();
+    });
+});
+
+function share() {
+  tg.shareMessage({
+    message: `Я только что выиграл в Tik-Tak-Toe! Попробуй и ты 😉`,
+    url: location.href,
+  });
 }
 </script>
 
@@ -268,7 +342,7 @@ body {
   color: #555;
 }
 
-.game__button-reset {
+.game__button {
   appearance: none;
   outline: none;
   border: none;
@@ -282,11 +356,18 @@ body {
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
-.game__button-reset:hover {
+.game__button:hover {
   background: #0052d6;
 }
 
-.game__button-reset:active {
+.game__button:active {
   transform: translateY(1px);
+}
+
+.game__stats {
+  font-size: 1.1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #555;
 }
 </style>
