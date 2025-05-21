@@ -107,7 +107,7 @@ const status = computed(() => {
     return `Победитель: ${winner.value}`;
   if (board.value.every((cell) => cell)) return "Ничья!";
   return gameMode.value === "bot" && currentTurnIsBot()
-    ? "Ходит&nbsp;бот…"
+    ? "Ходит бот…"
     : `Ход: ${xIsNext.value ? "X" : "O"}`;
 });
 
@@ -198,7 +198,7 @@ watch(board, () => impact("light"));
 watch(winner, (w) => w && tg?.hapticFeedback?.notificationOccurred("success"));
 
 watch(winner, (w) => {
-  if (!w) {
+  if (!w || w === 'draws') {
     tg?.MainButton.hide();
     return;
   }
