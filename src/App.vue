@@ -1,6 +1,6 @@
 <template>
   <div class="game">
-    <h1 class="game__title">Крестики‑нолики</h1>
+    <h1 class="game__title">Крестики-нолики</h1>
 
     <div class="game__modes">
       <button
@@ -41,10 +41,10 @@
 
     <div class="game__status">{{ status }}</div>
 
-    <button @click="reset" class="game__button">Сброс игру</button>
+    <button @click="reset" class="game__button">Сбросить игру</button>
 
     <div class="game__stats">
-      X - Побед: {{ stats.X }} | O - Побед: {{ stats.O }} | Ничья:
+      X — побед: {{ stats.X }} | O — побед: {{ stats.O }} | Ничья:
       {{ stats.draws }}
     </div>
 
@@ -99,13 +99,15 @@ const winningLine = computed(() => {
 
 const winner = computed(() => {
   if (winningLine.value.length) return board.value[winningLine.value[0]];
-  return !board.value.every((cell) => cell) ? null : "draws";
+  return board.value.every(Boolean) ? "draws" : null;
 });
 
 const status = computed(() => {
   if (winner.value && winner.value !== "draws")
     return `Победитель: ${winner.value}`;
-  if (board.value.every((cell) => cell)) return "Ничья!";
+
+  if (board.value.every(Boolean)) return "Ничья!";
+
   return gameMode.value === "bot" && currentTurnIsBot()
     ? "Ходит бот…"
     : `Ход: ${xIsNext.value ? "X" : "O"}`;
@@ -116,8 +118,10 @@ function makeMove(index) {
     board.value[index] ||
     winner.value ||
     (gameMode.value === "bot" && currentTurnIsBot())
-  )
+  ) {
     return;
+  }
+
   placeSymbol(index, xIsNext.value ? "X" : "O");
   maybeBotMove();
 }
@@ -129,16 +133,19 @@ function placeSymbol(index, symbol) {
 
 function currentTurnIsBot() {
   const currentSymbol = xIsNext.value ? "X" : "O";
+
   return gameMode.value === "bot" && botSymbol.value === currentSymbol;
 }
 
 function maybeBotMove() {
   if (!currentTurnIsBot() || winner.value) return;
+
   setTimeout(() => {
     const empty = board.value
       .map((v, i) => (v === "" ? i : null))
       .filter((v) => v !== null);
     if (!empty.length) return;
+
     const randomIndex = empty[Math.floor(Math.random() * empty.length)];
     placeSymbol(randomIndex, botSymbol.value);
   }, 300);
@@ -152,28 +159,45 @@ function reset() {
     botSymbol.value = botFirst ? "X" : "O";
     xIsNext.value = true;
 
-    if (botFirst) {
-      maybeBotMove();
-    }
+    if (botFirst) maybeBotMove();
   } else {
     xIsNext.value = true;
   }
 }
 
 onMounted(() => {
-  applyTheme();
   tg?.expand();
+  injectThemeVars();
 });
-tg?.onEvent("themeChanged", applyTheme);
 
-function applyTheme() {
-  const dark = tg?.colorScheme === "dark";
-  document.body.style.background = dark
-    ? "#1d1e22"
-    : "radial-gradient(circle at top, #f0f4ff 0%, #d9e8ff 100%)";
+tg?.onEvent("themeChanged", injectThemeVars);
+
+function injectThemeVars() {
+  if (!tg?.themeParams) return;
+
+  const root = document.documentElement;
+  const {
+    bg_color,
+    secondary_bg_color,
+    link_color,
+    destructive_text_color,
+    button_color,
+    button_text_color,
+  } = tg.themeParams;
+
+  root.style.setProperty("--app-bg", bg_color ?? "#f0f4ff");
+  root.style.setProperty("--app-secondary-bg", secondary_bg_color ?? "#ffffff");
+  root.style.setProperty("--app-link", link_color ?? "#0066ff");
+  root.style.setProperty(
+    "--app-destructive",
+    destructive_text_color ?? "#ff3366"
+  );
+  root.style.setProperty("--app-button", button_color ?? "#0066ff");
+  root.style.setProperty("--app-button-text", button_text_color ?? "#ffffff");
 }
 
 const stats = ref({ X: 0, O: 0, draws: 0 });
+
 onMounted(() => {
   tg?.deviceStorage?.getItem("ttt_stats", (err, val) => {
     if (!err && val) stats.value = JSON.parse(val);
@@ -200,8 +224,10 @@ watch(winner, (w) => w && tg?.hapticFeedback?.notificationOccurred("success"));
 watch(winner, (w) => {
   if (!w || w === "draws") {
     tg?.MainButton.hide();
+
     return;
   }
+
   tg.MainButton.setText(`🎉 ${w} победил – поделиться`)
     .show()
     .onClick(() => {
@@ -211,6 +237,7 @@ watch(winner, (w) => {
         stats: stats.value,
         ts: Date.now(),
       };
+
       tg.sendData(JSON.stringify(payload));
       tg.MainButton.offClick();
     });
@@ -226,6 +253,22 @@ function share() {
 </script>
 
 <style>
+:root {
+  --app-bg: var(--tg-theme-bg-color, #f0f4ff);
+  --app-secondary-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+
+  --app-text: var(--tg-theme-text-color, #333333);
+  --app-hint: var(--tg-theme-hint-color, #555555);
+
+  --app-link: var(--tg-theme-link-color, #0066ff);
+  --app-button: var(--tg-theme-button-color, #0066ff);
+  --app-button-winner: #ffe869;
+  --app-button-text: var(--tg-theme-button-text-color, #ffffff);
+
+  --app-destructive: var(--tg-theme-destructive-text-color, #ff3366);
+  --app-section-separator: var(--tg-theme-section-separator-color, #d0d7ff);
+}
+
 *,
 *::before,
 *::after {
@@ -237,25 +280,24 @@ function share() {
 body {
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  background: radial-gradient(circle at top, #f0f4ff 0%, #d9e8ff 100%);
+  background: var(--app-bg);
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--app-text);
 }
 
 .game {
   padding: 2rem;
-  background: #ffffff;
+  background: var(--app-secondary-bg);
   border-radius: 1.5rem;
-  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 15px 25px rgba(0 0 0 / 0.1);
 }
 
 .game__title {
   font-size: 2rem;
   margin-bottom: 1rem;
-  color: #333;
-  letter-spacing: 0.5px;
   text-align: center;
 }
 
@@ -266,11 +308,13 @@ body {
   margin-bottom: 1rem;
 }
 
-.game__mode-label {
+.game__mode-label,
+.game__status,
+.game__stats {
   text-align: center;
-  margin-bottom: 0.25rem;
-  color: #555;
-  font-size: 0.9rem;
+  color: var(--app-hint);
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .game__board {
@@ -283,8 +327,8 @@ body {
 .game__board-cell {
   width: 100px;
   height: 100px;
-  background: #fafafa;
-  border: 2px solid #d0d7ff;
+  background: var(--app-secondary-bg);
+  border: 2px solid var(--app-section-separator);
   border-radius: 1rem;
   display: flex;
   justify-content: center;
@@ -296,8 +340,8 @@ body {
 
 .game__board-cell:hover {
   transform: translateY(-4px);
-  background: #f5f8ff;
-  border-color: #b3c4ff;
+  background: color-mix(in srgb, var(--app-secondary-bg) 90%, #000 10%);
+  border-color: color-mix(in srgb, var(--app-section-separator) 80%, #000 20%);
 }
 
 .game__symbol {
@@ -314,17 +358,17 @@ body {
 }
 
 .game__board-cell_x .game__symbol {
-  color: #0066ff;
+  color: var(--app-link);
 }
 
 .game__board-cell_o .game__symbol {
-  color: #ff3366;
+  color: var(--app-destructive);
 }
 
 .game__board-cell_win,
 .game__board-cell_win:hover {
-  background: #ffe869;
-  border-color: #ffda47;
+  background: var(--app-button-winner);
+  border-color: var(--app-button);
   animation: pulse 0.8s infinite alternate;
 }
 
@@ -337,12 +381,6 @@ body {
   }
 }
 
-.game__status {
-  font-size: 1.1rem;
-  margin-bottom: 1.5rem;
-  color: #555;
-}
-
 .game__button {
   appearance: none;
   outline: none;
@@ -350,25 +388,18 @@ body {
   cursor: pointer;
   padding: 0.6rem 1.5rem;
   border-radius: 9999px;
-  background: #0066ff;
-  color: #fff;
+  background: var(--app-button);
+  color: var(--app-button-text);
   font-size: 1rem;
   font-weight: 600;
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .game__button:hover {
-  background: #0052d6;
+  background: color-mix(in srgb, var(--app-button) 85%, #000 15%);
 }
 
 .game__button:active {
   transform: translateY(1px);
-}
-
-.game__stats {
-  font-size: 1.1rem;
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
-  color: #555;
 }
 </style>
