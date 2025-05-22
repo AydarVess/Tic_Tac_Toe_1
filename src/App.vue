@@ -1,6 +1,7 @@
 <template>
   <div class="game">
     <h1 class="game__title">Крестики-нолики</h1>
+    <h1 class="game__sub-title">Давай сыграем, {{ firstName }}!</h1>
 
     <div class="game__modes">
       <button
@@ -204,6 +205,12 @@ onMounted(() => {
   });
 });
 
+const firstName = ref('')
+
+onMounted(() => {
+  firstName.value = tg?.initDataUnsafe?.user?.first_name || 'друг'
+})
+
 watch(
   () => winner.value,
   (w) => {
@@ -297,6 +304,12 @@ body {
 
 .game__title {
   font-size: 2rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.game__sub-title {
+  font-size: 1rem;
   margin-bottom: 1rem;
   text-align: center;
 }
